@@ -1293,6 +1293,7 @@ BoundsInfo scanForBounds(DecodedBinary& decoded, uint32_t bctrAddr, const CodeRe
       bctrAddr, region.start, region.end, funcStart, expectedReg);
 
   uint32_t scanAddr = bctrAddr;
+  uint8_t crField = 0xFF;
   for (int i = 0; i < backwardScanLimit && scanAddr >= scanLowerBound + 4; i++) {
     scanAddr -= 4;
     auto* insn = decoded.get(scanAddr);
@@ -1306,14 +1307,28 @@ BoundsInfo scanForBounds(DecodedBinary& decoded, uint32_t bctrAddr, const CodeRe
 
     using namespace rex::codegen::ppc;
 
+    if (crField == 0xFF) {
+      bool isCondBranch = (insn->opcode == Opcode::bc || insn->opcode == Opcode::bca ||
+                           insn->opcode == Opcode::bcl || insn->opcode == Opcode::bcla ||
+                           insn->opcode == Opcode::bclr || insn->opcode == Opcode::bclrl);
+      if (isCondBranch) {
+        uint8_t bi = insn->B.BI;
+        if ((bi & 0x3) == 1) {
+          crField = (bi >> 2) & 0x7;
+        }
+      }
+    }
+
     // Look for cmpli/cmpi followed by conditional branch
     if (insn->opcode == Opcode::cmpli) {
       // cmpli crX, L, rA, UIMM
       REXCODEGEN_TRACE("scanForBounds: found cmpli at 0x{:08X} RA=r{} UIMM={} (expecting r{})",
-                       scanAddr, static_cast<unsigned>(insn->D.RA), static_cast<int>(insn->D.d),
-                       expectedReg);
-      if (insn->D.RA == expectedReg) {
-        result.maxEntries = static_cast<uint32_t>(insn->D.d) + 1;
+                       scanAddr, static_cast<unsigned>(insn->D.RA),
+                       static_cast<unsigned>(insn->D.UIMM()), expectedReg);
+      uint8_t cmpCr = insn->D.RT >> 2;
+      uint16_t cmpImm = insn->D.UIMM();
+      if ((insn->D.RA == expectedReg || (crField != 0xFF && cmpCr == crField)) && cmpImm > 1) {
+        result.maxEntries = static_cast<uint32_t>(cmpImm) + 1;
         result.indexReg = expectedReg;
         result.found = true;
         REXCODEGEN_TRACE("scanForBounds: MATCHED! maxEntries={}", result.maxEntries);
@@ -1326,8 +1341,10 @@ BoundsInfo scanForBounds(DecodedBinary& decoded, uint32_t bctrAddr, const CodeRe
       REXCODEGEN_TRACE("scanForBounds: found cmpi at 0x{:08X} RA=r{} SIMM={} (expecting r{})",
                        scanAddr, static_cast<unsigned>(insn->D.RA), static_cast<int>(insn->D.d),
                        expectedReg);
-      if (insn->D.RA == expectedReg) {
-        result.maxEntries = static_cast<uint32_t>(insn->D.d) + 1;
+      uint8_t cmpCr = insn->D.RT >> 2;
+      int16_t cmpImm = insn->D.d;
+      if ((insn->D.RA == expectedReg || (crField != 0xFF && cmpCr == crField)) && cmpImm > 1) {
+        result.maxEntries = static_cast<uint32_t>(cmpImm) + 1;
         result.indexReg = expectedReg;
         result.found = true;
         REXCODEGEN_TRACE("scanForBounds: MATCHED! maxEntries={}", result.maxEntries);

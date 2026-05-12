@@ -224,13 +224,32 @@ extern PPCFuncMapping PPCFuncMappings[];
 #define REX_LOOKUP_FUNC(x, y) \
   (*(PPCFunc**)(x + REX_IMAGE_BASE + REX_IMAGE_SIZE + (u64(u32(y) - REX_CODE_BASE) * 2)))
 
+inline PPCFunc* REX_DEBUG_LOOKUP_FUNC(uint8_t* base, u32 target, PPCContext& ctx) {
+  if (target < REX_CODE_BASE || target >= REX_CODE_BASE + REX_CODE_SIZE) {
+    REX_FATAL("PPC indirect target outside code range: target=0x{:08X} lr=0x{:08X} "
+              "r3=0x{:08X} r5=0x{:08X} r10=0x{:08X} r11=0x{:08X}",
+              target, static_cast<u32>(ctx.lr), ctx.r3.u32, ctx.r5.u32, ctx.r10.u32,
+              ctx.r11.u32);
+  }
+
+  PPCFunc* func = REX_LOOKUP_FUNC(base, target);
+  if (!func) {
+    REX_FATAL("PPC indirect target has no registered host function: target=0x{:08X} "
+              "lr=0x{:08X} r3=0x{:08X} r5=0x{:08X} r10=0x{:08X} r11=0x{:08X}",
+              target, static_cast<u32>(ctx.lr), ctx.r3.u32, ctx.r5.u32, ctx.r10.u32,
+              ctx.r11.u32);
+  }
+
+  return func;
+}
+
 #ifdef REXGLUE_ENABLE_PROFILING
 #define REX_CALL_INDIRECT_FUNC(x) \
   PROFILE_FUNCTION_DISPATCHED();  \
-  REX_LOOKUP_FUNC(base, x)(ctx, base);
+  REX_DEBUG_LOOKUP_FUNC(base, x, ctx)(ctx, base);
 #else
 #define REX_CALL_INDIRECT_FUNC(x) \
-  REX_LOOKUP_FUNC(base, x)(ctx, base);
+  REX_DEBUG_LOOKUP_FUNC(base, x, ctx)(ctx, base);
 #endif
 
 //=============================================================================

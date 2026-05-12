@@ -185,6 +185,12 @@ bool Memory::Initialize() {
                               !REXCVAR_GET(protect_zero)
                                   ? memory::kMemoryProtectRead | memory::kMemoryProtectWrite
                                   : memory::kMemoryProtectNoAccess);
+  // Some titles touch low guest addresses just past the protected zero page.
+  // Keep that range zero-filled and committed instead of letting host page faults
+  // escape through direct recompiled memory loads.
+  heaps_.v00000000.AllocFixed(0x00010000, 0x000F0000, 0x1000,
+                              memory::kMemoryAllocationReserve | memory::kMemoryAllocationCommit,
+                              memory::kMemoryProtectRead | memory::kMemoryProtectWrite);
   heaps_.physical.AllocFixed(0x1FFF0000, 0x10000, 0x10000, memory::kMemoryAllocationReserve,
                              memory::kMemoryProtectNoAccess);
 
