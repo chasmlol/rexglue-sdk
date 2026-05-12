@@ -96,7 +96,12 @@ bool VirtualFileSystem::ResolveSymbolicLink(const std::string_view path, std::st
     // Found symlink!
     auto target_path = (*it).second;
     auto relative_path = result.substr((*it).first.size());
-    result = target_path + relative_path;
+    if (!target_path.empty() && !relative_path.empty() && target_path.back() != '\\' &&
+        target_path.back() != '/' && relative_path.front() != '\\' && relative_path.front() != '/') {
+      result = target_path + "\\" + relative_path;
+    } else {
+      result = target_path + relative_path;
+    }
     was_resolved = true;
   }
   return was_resolved;

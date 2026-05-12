@@ -262,10 +262,14 @@ bool Runtime::SetupVfs() {
   }
   REXSYS_INFO("  Mounted {} at {}", abs_game_root.string(), mount_path);
 
-  // Register symbolic links for game: and D:
+  // Register symbolic links for disc/root-style paths.
+  // Some games install their own package roots on Xbox 360 and keep using
+  // those names for streamed world data.
   file_system_->RegisterSymbolicLink("game:", mount_path);
   file_system_->RegisterSymbolicLink("d:", mount_path);
-  REXSYS_DEBUG("  Registered symbolic links: game:, d:");
+  file_system_->RegisterSymbolicLink("big:", mount_path);
+  file_system_->RegisterSymbolicLink("dlcbig:", mount_path);
+  REXSYS_DEBUG("  Registered symbolic links: game:, d:, big:, dlcbig:");
 
   // Mount update_data_root as update:\ if provided
   if (!update_data_root_.empty()) {
